@@ -1,6 +1,15 @@
+// app/page.js
+// Main page component for Dairy Flat Airlines booking system.
+// This is a client-side rendered page that handles:
+//   - Flight search by origin, destination, and date range
+//   - Flight booking with passenger details and invoice display
+//   - Booking cancellation by reference and email
+//   - Passenger booking lookup by email
+
 "use client";
 import { useState } from "react";
 
+// List of all airports served by Dairy Flat Airlines with their ICAO codes
 const AIRPORTS = [
   { code: "NZNE", name: "Dairy Flat" },
   { code: "YSSY", name: "Sydney" },
@@ -10,6 +19,8 @@ const AIRPORTS = [
   { code: "NZTL", name: "Lake Tekapo" },
 ];
 
+// Formats an ISO date string to a human-readable local time in NZ timezone
+// e.g. "Wed, 3 Jun, 04:30 pm"
 function formatTime(iso) {
   return new Date(iso).toLocaleString("en-NZ", {
     timeZone: "Pacific/Auckland",
@@ -21,35 +32,56 @@ function formatTime(iso) {
   });
 }
 
+// Calculates and formats the flight duration between departure and arrival times
+// e.g. "0h 55m"
 function formatDuration(dep, arr) {
   const mins = Math.round((new Date(arr) - new Date(dep)) / 60000);
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
 export default function Home() {
+  // Tab state: controls which section is displayed (search, cancel, mybookings)
   const [tab, setTab] = useState("search");
+
+  // Flight search form state
   const [form, setForm] = useState({
     orig: "NZNE",
     dest: "NZRO",
     date1: "",
     date2: "",
   });
+
+  // State for search results, loading indicator, and error messages
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // State for the flight selected by the user for booking
   const [selectedFlight, setSelectedFlight] = useState(null);
+
+  // Passenger details form state
   const [passenger, setPassenger] = useState({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
   });
+
+  // Invoice state shown after a successful booking
   const [invoice, setInvoice] = useState(null);
+
+  // Cancel booking form state
   const [cancelForm, setCancelForm] = useState({ bookingRef: "", email: "" });
+
+  // Result message after attempting to cancel a booking
   const [cancelResult, setCancelResult] = useState("");
+
+  // Email input and results for the My Bookings lookup
   const [lookupEmail, setLookupEmail] = useState("");
   const [myBookings, setMyBookings] = useState([]);
 
+  // Handles flight search form submission
+  // Calls GET /api/schedules with origin, destination, and date filters
   async function searchFlights(e) {
     e.preventDefault();
     setLoading(true);
@@ -63,6 +95,8 @@ export default function Home() {
     else setError(data.error);
   }
 
+  // Handles booking form submission
+  // Calls POST /api/bookings with selected flight ID and passenger details
   async function makeBooking(e) {
     e.preventDefault();
     const res = await fetch("/api/bookings", {
@@ -72,11 +106,14 @@ export default function Home() {
     });
     const data = await res.json();
     if (data.success) {
+      // Show invoice page on successful booking
       setInvoice({ ...data, flight: selectedFlight });
       setSelectedFlight(null);
     } else setError(data.error);
   }
 
+  // Handles booking cancellation form submission
+  // Calls DELETE /api/bookings with booking reference and email for verification
   async function cancelBooking(e) {
     e.preventDefault();
     const res = await fetch("/api/bookings", {
@@ -90,6 +127,8 @@ export default function Home() {
     );
   }
 
+  // Handles My Bookings lookup form submission
+  // Calls GET /api/passengers with the passenger's email
   async function lookupBookings(e) {
     e.preventDefault();
     const res = await fetch(
@@ -109,7 +148,7 @@ export default function Home() {
         fontFamily: "'Georgia', serif",
       }}
     >
-      {/* Hero */}
+      {/* Hero section — displays airline name and tagline */}
       <div
         style={{
           background:
@@ -146,7 +185,7 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Tabs */}
+      {/* Navigation tabs — Search Flights, Cancel Booking, My Bookings */}
       <div
         style={{
           display: "flex",
@@ -187,6 +226,7 @@ export default function Home() {
       </div>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "30px 20px" }}>
+        {/* Error message display */}
         {error && (
           <div
             style={{
@@ -202,9 +242,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* SEARCH TAB */}
+        {/* SEARCH TAB — Flight search form and results */}
         {tab === "search" && !invoice && (
           <>
+            {/* Flight search form with origin, destination, and date range inputs */}
             <form
               onSubmit={searchFlights}
               style={{
@@ -222,6 +263,7 @@ export default function Home() {
                   gap: 16,
                 }}
               >
+                {/* Origin and destination airport dropdowns */}
                 {[
                   ["orig", "From"],
                   ["dest", "To"],
@@ -263,6 +305,8 @@ export default function Home() {
                     </select>
                   </div>
                 ))}
+
+                {/* Date range inputs — colorScheme dark makes calendar icon visible */}
                 {[
                   ["date1", "From Date"],
                   ["date2", "To Date"],
@@ -296,6 +340,7 @@ export default function Home() {
                         fontFamily: "inherit",
                         fontSize: 14,
                         boxSizing: "border-box",
+                        colorScheme: "dark", // Makes calendar icon visible on dark background
                       }}
                     />
                   </div>
@@ -321,12 +366,14 @@ export default function Home() {
               </button>
             </form>
 
+            {/* Loading indicator while fetching flights */}
             {loading && (
               <p style={{ textAlign: "center", color: "#6a7d96" }}>
                 Searching...
               </p>
             )}
 
+            {/* Flight results list — shows available seats and Book Now button */}
             {flights.length > 0 && !selectedFlight && (
               <div>
                 <div
@@ -341,6 +388,7 @@ export default function Home() {
                   {flights.length} flight{flights.length !== 1 ? "s" : ""} found
                 </div>
                 {flights.map((f) => {
+                  // Calculate available seats by excluding cancelled bookings
                   const booked = f.bookings.filter(
                     (b) => b.status !== "cancelled",
                   ).length;
@@ -388,6 +436,7 @@ export default function Home() {
                           Arr: {formatTime(f.arrivalTime)} ·{" "}
                           {formatDuration(f.departureTime, f.arrivalTime)}
                         </div>
+                        {/* Seat availability indicator — green if available, red if full */}
                         <div
                           style={{
                             fontSize: 12,
@@ -410,6 +459,7 @@ export default function Home() {
                         >
                           NZ${f.price}
                         </div>
+                        {/* Book Now button — disabled and greyed out if flight is full */}
                         <button
                           onClick={() => setSelectedFlight(f)}
                           disabled={available === 0}
@@ -434,6 +484,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* Booking form — shown when user clicks Book Now on a flight */}
             {selectedFlight && (
               <div
                 style={{
@@ -454,6 +505,7 @@ export default function Home() {
                 >
                   Complete Your Booking
                 </div>
+                {/* Selected flight summary */}
                 <div
                   style={{
                     background: "#0d1520",
@@ -475,6 +527,7 @@ export default function Home() {
                     NZ${selectedFlight.price}
                   </strong>
                 </div>
+                {/* Passenger details form */}
                 <form onSubmit={makeBooking}>
                   <div
                     style={{
@@ -546,6 +599,7 @@ export default function Home() {
                     >
                       CONFIRM BOOKING
                     </button>
+                    {/* Back button returns user to flight results */}
                     <button
                       type="button"
                       onClick={() => setSelectedFlight(null)}
@@ -569,7 +623,7 @@ export default function Home() {
           </>
         )}
 
-        {/* INVOICE */}
+        {/* INVOICE — shown after a successful booking with full flight details */}
         {invoice && (
           <div
             style={{
@@ -598,6 +652,7 @@ export default function Home() {
                 </strong>
               </div>
             </div>
+            {/* Invoice details table — flight info, passenger, and price */}
             <div
               style={{
                 borderTop: "1px solid #1e2d45",
@@ -654,6 +709,7 @@ export default function Home() {
               Please save your booking reference. You will need it to cancel
               your booking.
             </p>
+            {/* Reset button to return to search and book another flight */}
             <div style={{ textAlign: "center" }}>
               <button
                 onClick={() => {
@@ -684,7 +740,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* CANCEL TAB */}
+        {/* CANCEL TAB — form to cancel a booking by reference and email */}
         {tab === "cancel" && (
           <div
             style={{
@@ -762,6 +818,7 @@ export default function Home() {
                 CANCEL BOOKING
               </button>
             </form>
+            {/* Cancellation result message */}
             {cancelResult && (
               <div
                 style={{
@@ -778,7 +835,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* MY BOOKINGS TAB */}
+        {/* MY BOOKINGS TAB — lookup all bookings for a given email address */}
         {tab === "mybookings" && (
           <div>
             <form
@@ -851,6 +908,8 @@ export default function Home() {
                 FIND BOOKINGS
               </button>
             </form>
+
+            {/* List of bookings found for the given email */}
             {myBookings.length > 0 &&
               myBookings.map((b, i) => (
                 <div
@@ -899,6 +958,7 @@ export default function Home() {
                       <div style={{ fontSize: 18, color: "#c9a84c" }}>
                         NZ${b.flight.price}
                       </div>
+                      {/* Booking status — green for confirmed, red for cancelled */}
                       <div
                         style={{
                           fontSize: 12,
@@ -914,6 +974,8 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+
+            {/* Message shown when no bookings are found for the email */}
             {myBookings.length === 0 && lookupEmail && (
               <p style={{ color: "#6a7d96" }}>
                 No bookings found for that email.
